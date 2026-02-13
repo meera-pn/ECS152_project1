@@ -70,48 +70,6 @@ class SlidingWindowSender:
             seq_num = 0
             offset = 0
             
-            ''' # Send file in chunks
-            while offset < total_bytes:
-                # TODO: Extract chunk of data from file_data
-                chunk = file_data[offset:offset + self.packet_size]
-                #print(f"DEBUG: offset={offset}, len(chunk)={len(chunk)}, packet_size={self.packet_size}")
-                # TODO: Create packet with sequence number and chunk
-                packet = self.create_packet(offset, chunk)
-                
-                # TODO: Start timer for this packet (for delay measurement)
-                packet_start_time = time.time()
-                ack_received = False
-                
-                # Stop-and-wait: send and wait for ACK
-                while not ack_received:
-                    try:
-                        # send packet to receiver
-                        sock.sendto(packet, (self.receiver_ip, self.receiver_port))
-                        #print(f"Sent packet at offset {offset}, waiting for ACK...")
-                        # wait for ACK
-                        ack_packet, _ = sock.recvfrom(1024)
-                        # parse ACK to get sequence number
-                        ack_seq_num = self.parse_ack(ack_packet)
-                        #print(f"Received ACK {ack_seq_num}, expected >= {offset + len(chunk)}")
-                        # check if ACK matches expected sequence number
-                        if ack_seq_num >= offset + len(chunk):
-                            #print(f"ACK accepted: {ack_seq_num} >= {offset + len(chunk)}")
-                            ack_received = True
-                            # calculate packet delay (current time - packet_start_time)
-                            packet_delay = time.time()-packet_start_time
-                            # append packet_delay to self.packet_delays
-                            self.packet_delays.append(packet_delay)
-                            
-                    except socket.timeout:
-                        # handle timeout - retransmit packet //COME BACK TO THIS
-                        #print(f"Timeout on packet {offset}, retrying...")
-                        pass
-                
-                # update offset to move to next chunk
-                offset += self.packet_size
-                # increment total_packets counter
-                self.total_packets += 1 '''
-            
             # Caclulation of total number of packets:
             all_packets = (total_bytes + self.packet_size - 1) // self.packet_size
             # Sliding window iniital configurations:
@@ -140,25 +98,26 @@ class SlidingWindowSender:
                     sock.sendto(packet, (self.receiver_ip, self.receiver_port))
                     next_seq += 1
                 
+
                 # Recieving ACKS here:
                 try:
                     ack_packet, _ = sock.recvfrom(1024)
                     ack_offset = self.parse_ack(ack_packet)
-                    acked_pkt1 = (ack_offset - 1) // self.packet_size # Converting ACK to a packet number..
-                    if acked_pkt1 >= 0:
+                    if ack_offset > 0:
+                        acked_pkt1 = (ack_offset - 1) // self.packet_size # Converting ACK to a packet number..
                         acked_pkt1 = min(acked_pkt1, all_packets - 1)
 
-                    for packet_number in range(acked_pkt1 + 1):  # This packet, and the ones before it, are now acknowledged
-                        if packet_number not in acked_packs:
-                            acked_packs.add(packet_number)
+                        for packet_number in range(acked_pkt1 + 1):  # This packet, and the ones before it, are now acknowledged
+                            if packet_number not in acked_packs:
+                                acked_packs.add(packet_number)
                             
-                            # Recording delay for this packet (debug)
-                            if packet_number in send_times:
-                                delay = time.time() - send_times[packet_number]
-                                self.packet_delays.append(delay)
+                                # Recording delay for this packet (debug)
+                                if packet_number in send_times:
+                                    delay = time.time() - send_times[packet_number]
+                                    self.packet_delays.append(delay)
                     
-                    while base in acked_packs and base < all_packets:
-                        base += 1
+                        while base in acked_packs and base < all_packets:
+                            base += 1
                         
                 except socket.timeout:
                     # Handling packet loss (attempt)
@@ -170,7 +129,7 @@ class SlidingWindowSender:
             
             # Update total packets counter
             self.total_packets = all_packets
-
+            
 
 
             # Step 4: Send empty message with correct sequence id to signal end
@@ -288,6 +247,6 @@ if __name__ == "__main__":
     
     # TODO: Get file_path from command line arguments
     file_path = sys.argv[1]
-    
-    # TODO: Call run_multiple_trials
-    run_multiple_trials(receiver_ip, receiver_port, file_path, num_trials=10)
+ 
+
+    run_multiple_trials(receiver_ip, receiver_port, file_path)
